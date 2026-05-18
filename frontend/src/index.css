@@ -1,0 +1,62 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --ink: #14120f;
+  --mute: #4e4a43;
+  --cream: #f6f0e6;
+  --clay: #f4d5bf;
+  --sand: #f2e6d8;
+  --tide: #0f7f7a;
+  --sunset: #f26b4f;
+  --dune: #c7b9a5;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: "Space Grotesk", system-ui, sans-serif;
+  color: var(--ink);
+  background: radial-gradient(circle at top, #fff7ec 0%, #f6efe5 45%, #f0e7da 100%);
+  min-height: 100vh;
+}
+
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  background: linear-gradient(120deg, rgba(15, 127, 122, 0.08), rgba(242, 107, 79, 0.08));
+  opacity: 0.65;
+  pointer-events: none;
+  z-index: -2;
+}
+
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  background-image: radial-gradient(rgba(20, 18, 15, 0.08) 0.5px, transparent 0.5px);
+  background-size: 12px 12px;
+  opacity: 0.2;
+  pointer-events: none;
+  z-index: -1;
+}
+
+#root {
+  min-height: 100vh;
+}
+
+.glass-card {
+  background: rgba(255, 255, 255, 0.75);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(199, 185, 165, 0.5);
+}
+
+.section-title {
+  font-family: "Fraunces", serif;
+  letter-spacing: -0.5px;
+}
