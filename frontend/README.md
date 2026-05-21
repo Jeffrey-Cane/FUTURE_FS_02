@@ -1,16 +1,23 @@
-# React + Vite
+# Pulse CRM Frontend
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+A lightweight CRM frontend for lead capture and admin management.
 
-Currently, two official plugins are available:
+## Setup
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+1. Install dependencies:
+   - `npm install`
+2. Create a local env file:
+   - Copy `.env.example` to `.env.local`
+   - Set `VITE_API_URL` to your backend URL
+3. Start the app:
+   - `npm run dev`
 
-## React Compiler
+## Admin Setup
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+The first admin account must be created once using the Setup section on the Login page.
 
-## Expanding the ESLint configuration
+After the first admin is created:
+- Remove or hide the Setup section in the Login UI so new admins cannot be created.
+- The login form should remain available for existing admins.
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+If you want to automate removal, do it by feature flag or by deleting the setup form in the login page component.
