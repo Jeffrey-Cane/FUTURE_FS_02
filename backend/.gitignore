@@ -1,5 +1,9 @@
 # Node
 node_modules/
+
+# Logs
+logs/
+*.log
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
@@ -14,17 +18,6 @@ pnpm-debug.log*
 /build/
 /coverage/
 
-# Backend
-backend/node_modules/
-backend/.env
-backend/.env.*
-backend/dist/
-backend/build/
-backend/coverage/
-
-# Vite
-frontend/dist/
-
 # OS
 .DS_Store
 Thumbs.db
@@ -37,10 +30,6 @@ Thumbs.db
 *.pid
 *.seed
 *.pid.lock
-
-# Logs
-logs/
-*.log
 
 # Misc
 *.tgz
