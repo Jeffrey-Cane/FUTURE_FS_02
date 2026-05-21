@@ -14,6 +14,14 @@ pnpm-debug.log*
 /build/
 /coverage/
 
+# Backend
+backend/node_modules/
+backend/.env
+backend/.env.*
+backend/dist/
+backend/build/
+backend/coverage/
+
 # Vite
 frontend/dist/
 
