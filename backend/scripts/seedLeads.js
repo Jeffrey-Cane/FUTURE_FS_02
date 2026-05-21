@@ -72,6 +72,18 @@ const INTENT_PRIORITY = {
 };
 
 const EMAIL_DOMAINS = ["gmail.com", "yahoo.com", "outlook.com", "company.co.ke", "example.com"];
+const PHONE_NUMBERS = [
+  "+254 700 123 456",
+  "+254 701 234 567",
+  "+254 702 345 678",
+  "+254 703 456 789",
+  "+254 704 567 890",
+  "+254 705 678 901",
+  "+254 706 789 012",
+  "+254 707 890 123",
+  "+254 708 901 234",
+  "+254 709 012 345"
+];
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -97,8 +109,9 @@ const buildLeadPayload = () => {
   const intent = pickOne(INTENTS);
   const context = pickOne(INTENT_CONTEXTS[intent]);
   const priority = INTENT_PRIORITY[intent];
+  const phone = pickOne(PHONE_NUMBERS);
 
-  const message = `${context} (Intent: ${intent}; Priority: ${priority})`;
+  const message = `${context} (Intent: ${intent}; Priority: ${priority}; Phone: ${phone})`;
 
   return {
     name,

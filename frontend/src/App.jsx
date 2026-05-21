@@ -3,6 +3,7 @@ import { NavLink, Route, Routes, useNavigate } from "react-router-dom";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
 const STATUSES = ["new", "contacted", "converted"];
+const PRIORITIES = ["High", "Medium", "Low"];
 
 const statusStyles = {
   new: "bg-sand text-ink border-dune",
@@ -10,7 +11,27 @@ const statusStyles = {
   converted: "bg-tide/15 text-ink border-tide"
 };
 
+const priorityStyles = {
+  High: "bg-sunset/15 text-sunset border-sunset",
+  Medium: "bg-clay text-ink border-sunset/40",
+  Low: "bg-sand text-ink border-dune",
+  Unknown: "bg-white/70 text-mute border-dune"
+};
+
 const classNames = (...classes) => classes.filter(Boolean).join(" ");
+
+const getLeadPriority = (lead) => {
+  if (lead?.priority && PRIORITIES.includes(lead.priority)) {
+    return lead.priority;
+  }
+
+  const message = lead?.message || "";
+  const match = message.match(/Priority:\s*(High|Medium|Low)/i);
+
+  if (!match) return "Unknown";
+
+  return match[1][0].toUpperCase() + match[1].slice(1).toLowerCase();
+};
 
 const PageShell = ({ children }) => (
   <div className="min-h-screen px-4 pb-16 pt-10 md:px-10">
@@ -304,11 +325,41 @@ const DashboardPage = ({ token, onLogout }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [noteBody, setNoteBody] = useState("");
+  const [activePriority, setActivePriority] = useState("High");
 
   const selectedLead = useMemo(
     () => leads.find((lead) => lead._id === selectedId) || leads[0] || null,
     [leads, selectedId]
   );
+
+  const leadsByPriority = useMemo(() => {
+    const buckets = {
+      High: [],
+      Medium: [],
+      Low: [],
+      Unknown: []
+    };
+
+    leads.forEach((lead) => {
+      const priority = getLeadPriority(lead);
+      const bucket = buckets[priority] ? priority : "Unknown";
+      buckets[bucket].push({ ...lead, priority: bucket });
+    });
+
+    return buckets;
+  }, [leads]);
+
+  useEffect(() => {
+    if (leadsByPriority[activePriority]?.length > 0) return;
+
+    const nextPriority = ["High", "Medium", "Low", "Unknown"].find(
+      (priority) => leadsByPriority[priority]?.length > 0
+    );
+
+    if (nextPriority && nextPriority !== activePriority) {
+      setActivePriority(nextPriority);
+    }
+  }, [activePriority, leadsByPriority]);
 
   useEffect(() => {
     const fetchLeads = async () => {
@@ -415,47 +466,99 @@ const DashboardPage = ({ token, onLogout }) => {
       </div>
       {error && <p className="text-sm font-semibold text-sunset">{error}</p>}
       <div className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
-        <div className="glass-card rounded-3xl p-6 shadow-card">
-          <div className="flex items-center justify-between">
-            <h3 className="section-title text-2xl font-semibold">Active leads</h3>
+        <div className="space-y-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h3 className="section-title text-2xl font-semibold">Active leads</h3>
+              <p className="text-sm text-mute">Grouped by urgency for faster triage.</p>
+            </div>
             <span className="rounded-full border border-dune px-3 py-1 text-xs font-semibold text-mute">
               {leads.length} total
             </span>
           </div>
-          <div className="mt-5 space-y-3">
-            {loading && <p className="text-sm text-mute">Loading leads...</p>}
-            {!loading && leads.length === 0 && (
-              <p className="text-sm text-mute">No leads yet. Submit a new inquiry.</p>
-            )}
-            {leads.map((lead) => (
+          <div className="flex flex-wrap gap-2">
+            {PRIORITIES.map((priority) => (
               <button
-                key={lead._id}
+                key={priority}
                 className={classNames(
-                  "w-full rounded-2xl border px-4 py-3 text-left transition",
-                  selectedLead?._id === lead._id
-                    ? "border-tide bg-tide/10"
-                    : "border-dune bg-white/60 hover:border-tide/60"
+                  "rounded-full border px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] transition",
+                  activePriority === priority
+                    ? "border-ink bg-ink text-cream"
+                    : "border-dune bg-white/70 text-mute hover:border-tide"
                 )}
-                onClick={() => setSelectedId(lead._id)}
+                onClick={() => setActivePriority(priority)}
                 type="button"
               >
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-semibold text-ink">{lead.name}</p>
-                    <p className="text-xs text-mute">{lead.email}</p>
-                  </div>
-                  <span
-                    className={classNames(
-                      "rounded-full border px-3 py-1 text-xs font-semibold uppercase",
-                      statusStyles[lead.status]
-                    )}
-                  >
-                    {lead.status}
-                  </span>
-                </div>
-                <p className="mt-2 text-xs text-mute">{lead.message}</p>
+                {priority} ({leadsByPriority[priority].length})
               </button>
             ))}
+            {leadsByPriority.Unknown.length > 0 && (
+              <button
+                className={classNames(
+                  "rounded-full border px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] transition",
+                  activePriority === "Unknown"
+                    ? "border-ink bg-ink text-cream"
+                    : "border-dune bg-white/70 text-mute hover:border-tide"
+                )}
+                onClick={() => setActivePriority("Unknown")}
+                type="button"
+              >
+                Unknown ({leadsByPriority.Unknown.length})
+              </button>
+            )}
+          </div>
+          {loading && <p className="text-sm text-mute">Loading leads...</p>}
+          {!loading && leads.length === 0 && (
+            <p className="text-sm text-mute">No leads yet. Submit a new inquiry.</p>
+          )}
+          <div className="glass-card rounded-3xl p-5 shadow-card">
+            <div className="flex items-center justify-between">
+              <h4 className="text-xs font-semibold uppercase tracking-[0.3em] text-mute">
+                {activePriority} priority
+              </h4>
+              <span
+                className={classNames(
+                  "rounded-full border px-3 py-1 text-xs font-semibold",
+                  priorityStyles[activePriority] || priorityStyles.Unknown
+                )}
+              >
+                {leadsByPriority[activePriority]?.length || 0}
+              </span>
+            </div>
+            <div className="mt-4 space-y-3">
+              {leadsByPriority[activePriority]?.length === 0 && !loading && (
+                <p className="text-xs text-mute">No {activePriority.toLowerCase()} priority leads.</p>
+              )}
+              {(leadsByPriority[activePriority] || []).map((lead) => (
+                <button
+                  key={lead._id}
+                  className={classNames(
+                    "w-full rounded-2xl border px-4 py-3 text-left transition",
+                    selectedLead?._id === lead._id
+                      ? "border-tide bg-tide/10"
+                      : "border-dune bg-white/60 hover:border-tide/60"
+                  )}
+                  onClick={() => setSelectedId(lead._id)}
+                  type="button"
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-semibold text-ink">{lead.name}</p>
+                      <p className="text-xs text-mute">{lead.email}</p>
+                    </div>
+                    <span
+                      className={classNames(
+                        "rounded-full border px-3 py-1 text-[11px] font-semibold uppercase",
+                        statusStyles[lead.status]
+                      )}
+                    >
+                      {lead.status}
+                    </span>
+                  </div>
+                  <p className="mt-2 text-xs text-mute">{lead.message}</p>
+                </button>
+              ))}
+            </div>
           </div>
         </div>
         <div className="glass-card rounded-3xl p-6 shadow-card">
