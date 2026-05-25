@@ -6,6 +6,22 @@ const router = express.Router();
 
 const ALLOWED_STATUSES = ["new", "contacted", "converted"];
 
+const normalizeLead = (leadDoc) => {
+  const data = leadDoc.toObject();
+
+  if (!data.followUps?.length && data.notes?.length) {
+    data.followUps = data.notes.map((note) => ({
+      note: note.body,
+      createdAt: note.createdAt,
+      createdBy: note.createdBy,
+      followUpDate: note.followUpDate
+    }));
+  }
+
+  delete data.notes;
+  return data;
+};
+
 router.post("/", async (req, res) => {
   try {
     const { name, email, message, source } = req.body;
@@ -33,14 +49,29 @@ router.use(requireAuth);
 router.get("/", async (req, res) => {
   try {
     const leads = await Lead.find().sort({ createdAt: -1 });
-    return res.json(leads);
+    return res.json(leads.map(normalizeLead));
   } catch (err) {
     console.error("Lead fetch error", err);
     return res.status(500).json({ error: "failed to fetch leads" });
   }
 });
 
-router.patch("/:id/status", async (req, res) => {
+router.get("/:id", async (req, res) => {
+  try {
+    const lead = await Lead.findById(req.params.id);
+
+    if (!lead) {
+      return res.status(404).json({ error: "lead not found" });
+    }
+
+    return res.json(normalizeLead(lead));
+  } catch (err) {
+    console.error("Lead detail error", err);
+    return res.status(500).json({ error: "failed to fetch lead" });
+  }
+});
+
+const updateStatusHandler = async (req, res) => {
   try {
     const { status } = req.body;
 
@@ -50,7 +81,7 @@ router.patch("/:id/status", async (req, res) => {
 
     const lead = await Lead.findByIdAndUpdate(
       req.params.id,
-      { status },
+      { status, statusUpdatedAt: new Date() },
       { new: true, runValidators: true }
     );
 
@@ -58,19 +89,22 @@ router.patch("/:id/status", async (req, res) => {
       return res.status(404).json({ error: "lead not found" });
     }
 
-    return res.json(lead);
+    return res.json(normalizeLead(lead));
   } catch (err) {
     console.error("Lead status update error", err);
     return res.status(500).json({ error: "failed to update status" });
   }
-});
+};
 
-router.post("/:id/notes", async (req, res) => {
+router.put("/:id/status", updateStatusHandler);
+router.patch("/:id/status", updateStatusHandler);
+
+router.post("/:id/followups", async (req, res) => {
   try {
-    const { body } = req.body;
+    const { note, createdBy, followUpDate } = req.body;
 
-    if (!body) {
-      return res.status(400).json({ error: "note body is required" });
+    if (!note) {
+      return res.status(400).json({ error: "note is required" });
     }
 
     const lead = await Lead.findById(req.params.id);
@@ -78,13 +112,13 @@ router.post("/:id/notes", async (req, res) => {
       return res.status(404).json({ error: "lead not found" });
     }
 
-    lead.notes.unshift({ body });
+    lead.followUps.unshift({ note, createdBy, followUpDate });
     await lead.save();
 
-    return res.status(201).json(lead);
+    return res.status(201).json(normalizeLead(lead));
   } catch (err) {
-    console.error("Lead notes error", err);
-    return res.status(500).json({ error: "failed to add note" });
+    console.error("Lead follow-up error", err);
+    return res.status(500).json({ error: "failed to add follow-up" });
   }
 });
 

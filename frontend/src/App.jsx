@@ -20,6 +20,25 @@ const priorityStyles = {
 
 const classNames = (...classes) => classes.filter(Boolean).join(" ");
 
+const formatTimestamp = (value) => {
+  if (!value) return "--";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "--";
+  return date.toLocaleString();
+};
+
+const getLastActivityAt = (lead) => {
+  if (!lead) return null;
+  const followUpDates = (lead.followUps || []).map((item) => item.createdAt).filter(Boolean);
+  const candidates = [lead.statusUpdatedAt, lead.updatedAt, lead.createdAt, ...followUpDates].filter(Boolean);
+  if (candidates.length === 0) return null;
+
+  return candidates
+    .map((value) => new Date(value))
+    .filter((date) => !Number.isNaN(date.getTime()))
+    .sort((a, b) => b.getTime() - a.getTime())[0];
+};
+
 const getLeadPriority = (lead) => {
   if (lead?.priority && PRIORITIES.includes(lead.priority)) {
     return lead.priority;
@@ -322,15 +341,11 @@ const LoginPage = ({ onLogin }) => {
 const DashboardPage = ({ token, onLogout }) => {
   const [leads, setLeads] = useState([]);
   const [selectedId, setSelectedId] = useState(null);
+  const [selectedLead, setSelectedLead] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [noteBody, setNoteBody] = useState("");
   const [activePriority, setActivePriority] = useState("High");
-
-  const selectedLead = useMemo(
-    () => leads.find((lead) => lead._id === selectedId) || leads[0] || null,
-    [leads, selectedId]
-  );
 
   const leadsByPriority = useMemo(() => {
     const buckets = {
@@ -391,10 +406,41 @@ const DashboardPage = ({ token, onLogout }) => {
     fetchLeads();
   }, [token]);
 
+  useEffect(() => {
+    const fetchLeadDetails = async () => {
+      if (!token || !selectedId) {
+        setSelectedLead(null);
+        return;
+      }
+
+      try {
+        const response = await fetch(`${API_URL}/api/leads/${selectedId}`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+
+        const payload = await response.json();
+        if (!response.ok) {
+          throw new Error(payload.error || "Unable to load lead details");
+        }
+
+        setSelectedLead(payload);
+      } catch (err) {
+        setError(err.message || "Unable to load lead details");
+      }
+    };
+
+    fetchLeadDetails();
+  }, [selectedId, token]);
+
+  const mergeLeadUpdate = (updatedLead) => {
+    setLeads((prev) => prev.map((lead) => (lead._id === updatedLead._id ? updatedLead : lead)));
+    setSelectedLead((prev) => (prev && prev._id === updatedLead._id ? updatedLead : prev));
+  };
+
   const updateStatus = async (leadId, status) => {
     try {
       const response = await fetch(`${API_URL}/api/leads/${leadId}/status`, {
-        method: "PATCH",
+        method: "PUT",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`
@@ -407,23 +453,23 @@ const DashboardPage = ({ token, onLogout }) => {
         throw new Error(payload.error || "Unable to update status");
       }
 
-      setLeads((prev) => prev.map((lead) => (lead._id === leadId ? payload : lead)));
+      mergeLeadUpdate(payload);
     } catch (err) {
       setError(err.message || "Unable to update status");
     }
   };
 
-  const addNote = async () => {
+  const addFollowUp = async () => {
     if (!noteBody.trim() || !selectedLead) return;
 
     try {
-      const response = await fetch(`${API_URL}/api/leads/${selectedLead._id}/notes`, {
+      const response = await fetch(`${API_URL}/api/leads/${selectedLead._id}/followups`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`
         },
-        body: JSON.stringify({ body: noteBody.trim() })
+        body: JSON.stringify({ note: noteBody.trim() })
       });
 
       const payload = await response.json();
@@ -431,10 +477,10 @@ const DashboardPage = ({ token, onLogout }) => {
         throw new Error(payload.error || "Unable to add note");
       }
 
-      setLeads((prev) => prev.map((lead) => (lead._id === payload._id ? payload : lead)));
+      mergeLeadUpdate(payload);
       setNoteBody("");
     } catch (err) {
-      setError(err.message || "Unable to add note");
+      setError(err.message || "Unable to add follow-up");
     }
   };
 
@@ -525,39 +571,72 @@ const DashboardPage = ({ token, onLogout }) => {
                 {leadsByPriority[activePriority]?.length || 0}
               </span>
             </div>
-            <div className="mt-4 space-y-3">
+            <div className="mt-4">
               {leadsByPriority[activePriority]?.length === 0 && !loading && (
                 <p className="text-xs text-mute">No {activePriority.toLowerCase()} priority leads.</p>
               )}
-              {(leadsByPriority[activePriority] || []).map((lead) => (
-                <button
-                  key={lead._id}
-                  className={classNames(
-                    "w-full rounded-2xl border px-4 py-3 text-left transition",
-                    selectedLead?._id === lead._id
-                      ? "border-tide bg-tide/10"
-                      : "border-dune bg-white/60 hover:border-tide/60"
-                  )}
-                  onClick={() => setSelectedId(lead._id)}
-                  type="button"
-                >
-                  <div className="flex items-center justify-between gap-3">
-                    <div>
-                      <p className="text-sm font-semibold text-ink">{lead.name}</p>
-                      <p className="text-xs text-mute">{lead.email}</p>
-                    </div>
-                    <span
-                      className={classNames(
-                        "rounded-full border px-3 py-1 text-[11px] font-semibold uppercase",
-                        statusStyles[lead.status]
-                      )}
-                    >
-                      {lead.status}
-                    </span>
-                  </div>
-                  <p className="mt-2 text-xs text-mute">{lead.message}</p>
-                </button>
-              ))}
+              {(leadsByPriority[activePriority] || []).length > 0 && (
+                <div className="overflow-hidden rounded-2xl border border-dune/70">
+                  <table className="w-full border-collapse text-left text-xs">
+                    <thead className="bg-white/70 text-[11px] uppercase tracking-[0.25em] text-mute">
+                      <tr>
+                        <th className="px-4 py-3 font-semibold">Lead</th>
+                        <th className="px-4 py-3 font-semibold">Status</th>
+                        <th className="px-4 py-3 font-semibold">Last activity</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {(leadsByPriority[activePriority] || []).map((lead) => {
+                        const isActive = selectedId === lead._id;
+                        const lastActivity = getLastActivityAt(lead);
+
+                        return (
+                          <tr
+                            key={lead._id}
+                            className={classNames(
+                              "cursor-pointer border-t border-dune/60 transition",
+                              isActive ? "bg-tide/10" : "bg-white/60 hover:bg-white/80"
+                            )}
+                            onClick={() => setSelectedId(lead._id)}
+                          >
+                            <td className="px-4 py-3">
+                              <p className="text-sm font-semibold text-ink">{lead.name}</p>
+                              <p className="mt-1 text-[11px] text-mute">{lead.email}</p>
+                            </td>
+                            <td className="px-4 py-3">
+                              <div className="flex flex-wrap items-center gap-2">
+                                <span
+                                  className={classNames(
+                                    "rounded-full border px-3 py-1 text-[10px] font-semibold uppercase",
+                                    statusStyles[lead.status]
+                                  )}
+                                >
+                                  {lead.status}
+                                </span>
+                                <select
+                                  className="rounded-full border border-dune bg-white/80 px-3 py-1 text-[10px] font-semibold uppercase"
+                                  onChange={(event) => updateStatus(lead._id, event.target.value)}
+                                  onClick={(event) => event.stopPropagation()}
+                                  value={lead.status}
+                                >
+                                  {STATUSES.map((status) => (
+                                    <option key={status} value={status}>
+                                      {status}
+                                    </option>
+                                  ))}
+                                </select>
+                              </div>
+                            </td>
+                            <td className="px-4 py-3 text-[11px] uppercase tracking-[0.2em] text-mute">
+                              {formatTimestamp(lastActivity)}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -570,6 +649,9 @@ const DashboardPage = ({ token, onLogout }) => {
               </div>
               <div className="rounded-2xl border border-dune bg-white/60 p-4">
                 <p className="text-sm text-ink">{selectedLead.message}</p>
+                <p className="mt-3 text-[11px] uppercase tracking-[0.2em] text-mute">
+                  Last activity {formatTimestamp(getLastActivityAt(selectedLead))}
+                </p>
               </div>
               <div className="flex flex-wrap items-center gap-3">
                 <span className="text-xs font-semibold uppercase tracking-[0.3em] text-mute">Status</span>
@@ -586,16 +668,29 @@ const DashboardPage = ({ token, onLogout }) => {
                 </select>
               </div>
               <div>
-                <h4 className="text-sm font-semibold uppercase tracking-[0.3em] text-mute">Notes</h4>
+                <h4 className="text-sm font-semibold uppercase tracking-[0.3em] text-mute">Follow-ups</h4>
                 <div className="mt-3 space-y-3">
-                  {(selectedLead.notes || []).length === 0 && (
-                    <p className="text-xs text-mute">No notes yet.</p>
+                  {(selectedLead.followUps || []).length === 0 && (
+                    <p className="text-xs text-mute">No follow-ups yet.</p>
                   )}
-                  {(selectedLead.notes || []).map((note) => (
-                    <div key={note._id || note.createdAt} className="rounded-2xl border border-dune bg-white/60 p-3">
-                      <p className="text-xs text-ink">{note.body}</p>
+                  {(selectedLead.followUps || []).map((followUp) => (
+                    <div
+                      key={followUp._id || followUp.createdAt}
+                      className="rounded-2xl border border-dune bg-white/60 p-3"
+                    >
+                      <p className="text-xs text-ink">{followUp.note}</p>
+                      {followUp.createdBy && (
+                        <p className="mt-2 text-[11px] uppercase tracking-[0.2em] text-mute">
+                          {followUp.createdBy}
+                        </p>
+                      )}
+                      {followUp.followUpDate && (
+                        <p className="mt-2 text-[11px] uppercase tracking-[0.2em] text-mute">
+                          Follow-up {formatTimestamp(followUp.followUpDate)}
+                        </p>
+                      )}
                       <p className="mt-2 text-[11px] uppercase tracking-[0.2em] text-mute">
-                        {new Date(note.createdAt).toLocaleString()}
+                        {formatTimestamp(followUp.createdAt)}
                       </p>
                     </div>
                   ))}
@@ -604,16 +699,16 @@ const DashboardPage = ({ token, onLogout }) => {
               <div className="space-y-2">
                 <textarea
                   className="h-24 w-full rounded-2xl border border-dune bg-white/80 px-4 py-3 text-sm outline-none focus:border-tide"
-                  placeholder="Add a note for this lead..."
+                  placeholder="Log a follow-up note..."
                   value={noteBody}
                   onChange={(event) => setNoteBody(event.target.value)}
                 />
                 <button
                   className="w-full rounded-2xl bg-ink px-6 py-3 text-xs font-semibold uppercase tracking-[0.3em] text-cream"
-                  onClick={addNote}
+                  onClick={addFollowUp}
                   type="button"
                 >
-                  Save note
+                  Save follow-up
                 </button>
               </div>
             </div>

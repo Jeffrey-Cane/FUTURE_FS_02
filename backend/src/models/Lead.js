@@ -11,10 +11,13 @@ const leadSchema = new mongoose.Schema(
       enum: ["new", "contacted", "converted"],
       default: "new"
     },
-    notes: [
+    statusUpdatedAt: { type: Date, default: Date.now },
+    followUps: [
       {
-        body: { type: String, required: true, trim: true },
-        createdAt: { type: Date, default: Date.now }
+        note: { type: String, required: true, trim: true },
+        createdAt: { type: Date, default: Date.now },
+        createdBy: { type: String, trim: true },
+        followUpDate: { type: Date }
       }
     ]
   },
