@@ -9,6 +9,7 @@ COPY frontend/vite.config.js ./
 COPY frontend/postcss.config.js ./
 COPY frontend/tailwind.config.js ./
 COPY frontend/.env.example ./
+COPY frontend/index.html ./
 COPY frontend/public ./public
 COPY frontend/src ./src
 
