@@ -1,0 +1,16 @@
+services:
+  - type: web
+    name: future-fs-crm
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    plan: starter
+    branch: main
+    autoDeploy: true
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: JWT_SECRET
+        generateValue: true
+      - key: MONGODB_URI
+        sync: false

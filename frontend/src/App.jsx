@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { NavLink, Route, Routes, useNavigate } from "react-router-dom";
 
-const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
+const API_URL = import.meta.env.VITE_API_URL || window.location.origin;
 const STATUSES = ["new", "contacted", "converted"];
 const PRIORITIES = ["High", "Medium", "Low"];
 
