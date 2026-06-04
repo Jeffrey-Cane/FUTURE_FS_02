@@ -22,9 +22,6 @@ COPY backend/package*.json ./
 RUN npm install --production
 
 COPY backend/src ./src
-COPY backend/routes ./routes
-COPY backend/models ./models
-COPY backend/middleware ./middleware
 COPY backend/scripts ./scripts
 
 COPY --from=frontend-build /app/frontend/dist ./frontend-dist
